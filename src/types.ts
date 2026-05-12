@@ -14,6 +14,7 @@ export interface ServerNode {
   isActive: boolean; // For dynamic topology (simulate offline)
   currentLoad: number;
   maxCapacity: number;
+  processingSpeed: number;
   resolvedCount: number;
   droppedCount: number;
   /** Processing slots – each entry is the remaining time (ms) for that request */
@@ -79,7 +80,12 @@ export interface SimulationStats {
   totalDropped: number;
   serverLoads: number[];
   serverStatus: boolean[];
+  serverCapacities: number[];
+  serverSpeeds: number[];
+  inFlightCounts: number[];
+  serverQueues: number[][];
   algorithm: AlgorithmMode;
   packetsPerSecond: number;
   history: HistoricalDataPoint[];
+  roundRobinIndex: number;
 }

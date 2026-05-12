@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { SimulationState } from '../types';
+import { SimulationState, Vec2 } from '../types';
 import { tickSimulation, createInitialState } from '../simulation';
 import { renderFrame } from '../renderer';
 
@@ -14,6 +14,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({ stateRef, onStatsUp
   const lastTimeRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
   const statsTickRef = useRef<number>(0);
+  const mousePosRef = useRef<Vec2 | null>(null);
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -63,7 +64,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({ stateRef, onStatsUp
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.save();
-        renderFrame(ctx, stateRef.current, rect.width, rect.height, now - startTimeRef.current);
+        renderFrame(ctx, stateRef.current, rect.width, rect.height, now - startTimeRef.current, mousePosRef.current);
         ctx.restore();
       }
 
@@ -79,9 +80,26 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({ stateRef, onStatsUp
 
     animFrameRef.current = requestAnimationFrame(loop);
 
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mousePosRef.current = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    };
+
+    const handleMouseLeave = () => {
+      mousePosRef.current = null;
+    };
+
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseleave', handleMouseLeave);
+
     return () => {
       cancelAnimationFrame(animFrameRef.current);
       window.removeEventListener('resize', handleResize);
+      canvas.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('mouseleave', handleMouseLeave);
     };
   }, [stateRef, onStatsUpdate, resizeCanvas]);
 

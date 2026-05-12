@@ -428,7 +428,8 @@ export function renderFrame(
   state: SimulationState,
   canvasW: number,
   canvasH: number,
-  time: number
+  time: number,
+  mousePos: Vec2 | null = null
 ) {
   const { lbPos } = computeLayout(canvasW, canvasH);
 
@@ -444,4 +445,51 @@ export function renderFrame(
   }
 
   drawHUD(ctx, canvasW, canvasH, state, time);
+
+  // Draw tooltips on top of everything
+  if (mousePos) {
+    for (const srv of state.servers) {
+      drawServerTooltip(ctx, srv, mousePos, canvasW, canvasH);
+    }
+  }
+}
+
+function drawServerTooltip(ctx: CanvasRenderingContext2D, srv: ServerNode, mousePos: Vec2, canvasW: number, canvasH: number) {
+  const w = 90, h = 60;
+  const bx = srv.position.x - w / 2;
+  const by = srv.position.y - h / 2;
+  
+  if (mousePos.x >= bx && mousePos.x <= bx + w && mousePos.y >= by && mousePos.y <= by + h) {
+    const tw = 175;
+    const th = 85;
+    let tx = mousePos.x + 15;
+    let ty = mousePos.y + 15;
+
+    // Prevent clipping
+    if (tx + tw > canvasW) tx = mousePos.x - tw - 15;
+    if (ty + th > canvasH) ty = mousePos.y - th - 15;
+
+    ctx.fillStyle = 'rgba(12, 14, 30, 0.95)';
+    ctx.strokeStyle = '#00c8ff';
+    ctx.lineWidth = 1;
+    roundRect(ctx, tx, ty, tw, th, 6);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.fillStyle = '#00c8ff';
+    ctx.font = '700 11px "Orbitron", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`Características ${srv.label}`, tx + 10, ty + 10);
+    
+    ctx.fillStyle = '#e0e8f0';
+    ctx.font = '500 11px "Share Tech Mono", monospace';
+    ctx.fillText(`Estado: ${srv.isActive ? 'Online' : 'Offline'}`, tx + 10, ty + 28);
+    ctx.fillText(`Capacidad Máx: ${srv.maxCapacity} req`, tx + 10, ty + 42);
+    ctx.fillText(`Vel. Proceso: x${srv.processingSpeed.toFixed(1)}`, tx + 10, ty + 56);
+    
+    const cost = srv.isActive ? (srv.currentLoad / srv.maxCapacity).toFixed(2) : 'N/A';
+    ctx.fillStyle = srv.isActive ? '#00ff88' : '#ff3344';
+    ctx.fillText(`Costo Base: ${cost}`, tx + 10, ty + 70);
+  }
 }

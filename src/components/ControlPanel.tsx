@@ -8,6 +8,8 @@ interface ControlPanelProps {
   onAlgorithmChange: (mode: AlgorithmMode) => void;
   onToggleServer: (id: number) => void;
   onReset: () => void;
+  showFormulas: boolean;
+  onToggleFormulas: () => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -16,6 +18,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onAlgorithmChange,
   onToggleServer,
   onReset,
+  showFormulas,
+  onToggleFormulas,
 }) => {
   const isNash = stats.algorithm === 'nash';
 
@@ -104,6 +108,19 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <div>
               <strong>Equilibrio Nash</strong>
               <small>Heurístico adaptativo</small>
+            </div>
+          </button>
+        </div>
+        <div style={{ marginTop: '10px' }}>
+          <button 
+            className={`algo-btn ${showFormulas ? 'active' : ''} formula-btn`}
+            onClick={onToggleFormulas}
+            style={{ width: '100%', borderColor: '#00c8ff' }}
+          >
+            <span className="algo-icon">∑</span>
+            <div>
+              <strong>Ver Fórmulas en Caliente</strong>
+              <small>Datos en tiempo real</small>
             </div>
           </button>
         </div>

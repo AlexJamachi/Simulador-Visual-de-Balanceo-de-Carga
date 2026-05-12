@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
 import ControlPanel from './components/ControlPanel';
+import FormulaPanel from './components/FormulaPanel';
 import { SimulationState, SimulationStats, AlgorithmMode } from './types';
 import { createInitialState } from './simulation';
 
@@ -15,10 +16,17 @@ function App() {
     totalDropped: 0,
     serverLoads: [0, 0, 0, 0],
     serverStatus: [true, true, true, true],
+    serverCapacities: [150, 80, 120, 200],
+    serverSpeeds: [1.2, 0.8, 1.0, 1.5],
+    inFlightCounts: [0, 0, 0, 0],
+    serverQueues: [[], [], [], []],
     algorithm: 'round-robin',
     packetsPerSecond: 10,
     history: [],
+    roundRobinIndex: 0,
   });
+
+  const [showFormulas, setShowFormulas] = useState(false);
 
   const handleStatsUpdate = useCallback(() => {
     const s = stateRef.current;
@@ -27,9 +35,14 @@ function App() {
       totalDropped: s.totalDropped,
       serverLoads: s.servers.map(srv => (srv.currentLoad / srv.maxCapacity) * 100),
       serverStatus: s.servers.map(srv => srv.isActive),
+      serverCapacities: s.servers.map(srv => srv.maxCapacity),
+      serverSpeeds: s.servers.map(srv => srv.processingSpeed),
+      inFlightCounts: s.servers.map((_, i) => s.packets.filter(p => p.targetServer === i).length),
+      serverQueues: s.servers.map(srv => [...srv.processingQueue]),
       algorithm: s.algorithm,
       packetsPerSecond: s.packetsPerSecond,
       history: [...s.history], // Shallow copy to trigger re-render
+      roundRobinIndex: s.roundRobinIndex,
     });
   }, []);
 
@@ -65,8 +78,11 @@ function App() {
   return (
     <div className="app-layout" id="app-root">
       <SimulationCanvas stateRef={stateRef} onStatsUpdate={handleStatsUpdate} />
+      <FormulaPanel stats={stats} visible={showFormulas} onClose={() => setShowFormulas(false)} />
       <ControlPanel
         stats={stats}
+        showFormulas={showFormulas}
+        onToggleFormulas={() => setShowFormulas(!showFormulas)}
         onTrafficChange={handleTrafficChange}
         onAlgorithmChange={handleAlgorithmChange}
         onToggleServer={handleToggleServer}

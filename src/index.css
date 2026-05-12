@@ -584,3 +584,23 @@ html, body, #root {
 .server-toggle.offline { color: var(--red); text-shadow: 0 0 5px var(--red-dim); }
 .offline-row { opacity: 0.6; filter: grayscale(0.5); }
 .srv-bar-fill.bar-offline { background: #334455; box-shadow: none; animation: none; }
+
+/* -- Formula Panel -- */
+.formula-panel { position: absolute; top: 20px; left: 20px; width: 400px; background: rgba(12, 14, 30, 0.95); border: 1px solid var(--cyan); border-radius: var(--radius); padding: 16px; box-shadow: 0 0 20px rgba(0, 200, 255, 0.2); backdrop-filter: blur(10px); z-index: 100; color: var(--text-primary); }
+.formula-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border-accent); padding-bottom: 8px; }
+.formula-header h3 { font-family: var(--font-display); font-size: 14px; color: var(--cyan); display: flex; align-items: center; gap: 8px; margin: 0; }
+.close-btn { background: transparent; border: none; color: var(--red); font-size: 20px; cursor: pointer; line-height: 1; transition: text-shadow 0.2s; padding: 0; margin: 0; }
+.close-btn:hover { text-shadow: 0 0 10px var(--red); }
+.formula-content h4 { font-family: var(--font-display); font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.math-box { background: rgba(0, 0, 0, 0.3); border-left: 3px solid var(--green); padding: 10px; margin-bottom: 16px; font-family: var(--font-mono); font-size: 11px; color: var(--text-primary); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.math-box code { display: block; color: var(--cyan); margin-bottom: 6px; font-size: 13px; font-weight: bold; }
+.math-box p { color: var(--text-secondary); margin-top: 4px; margin-bottom: 0; }
+.data-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 11px; text-align: left; }
+.data-table th { padding: 8px 4px; border-bottom: 1px solid var(--border-subtle); color: var(--text-dim); text-transform: uppercase; }
+.data-table td { padding: 8px 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.data-table tr:last-child td { border-bottom: none; }
+.cost-col { color: var(--yellow); font-weight: bold; }
+.rr-status { background: rgba(255, 204, 0, 0.1); border: 1px solid rgba(255, 204, 0, 0.3); padding: 12px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+.rr-status p { margin: 0; }
+.next-srv-badge { background: var(--yellow); color: #000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-family: var(--font-mono); }
+

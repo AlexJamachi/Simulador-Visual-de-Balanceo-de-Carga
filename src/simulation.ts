@@ -29,13 +29,18 @@ export function computeLayout(canvasW: number, canvasH: number) {
 export function createInitialState(canvasW: number, canvasH: number): SimulationState {
   const { serverPositions } = computeLayout(canvasW, canvasH);
 
+  // Diverse characteristics for 4 servers
+  const capacities = [150, 80, 120, 200];
+  const speeds = [1.2, 0.8, 1.0, 1.5]; // Multipliers
+
   const servers: ServerNode[] = serverPositions.map((pos, i) => ({
     id: i,
     label: `SRV-${String(i + 1).padStart(2, '0')}`,
     position: pos,
     isActive: true, // Start online
     currentLoad: 0,
-    maxCapacity: 100,
+    maxCapacity: capacities[i] || 100,
+    processingSpeed: speeds[i] || 1.0,
     resolvedCount: 0,
     droppedCount: 0,
     processingQueue: [],
@@ -249,8 +254,9 @@ export function tickSimulation(state: SimulationState, dt: number, canvasW: numb
     }
     
     const completed: number[] = [];
+    const speed = srv.processingSpeed || 1.0;
     for (let j = 0; j < srv.processingQueue.length; j++) {
-      srv.processingQueue[j] -= dt;
+      srv.processingQueue[j] -= (dt * speed);
       if (srv.processingQueue[j] <= 0) {
         completed.push(j);
       }
