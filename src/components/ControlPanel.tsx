@@ -1,13 +1,15 @@
 import React from 'react';
 import type { SimulationStats, AlgorithmMode } from '../types';
 import { HistoryChart } from './HistoryChart';
+import { InfoModal } from './InfoModal';
 
 interface ControlPanelProps {
   stats: SimulationStats;
   onTrafficChange: (pps: number) => void;
   onAlgorithmChange: (mode: AlgorithmMode) => void;
   onToggleServer: (id: number) => void;
-  onReset: () => void;
+  onReset: (preserveStats?: boolean) => void;
+  onSetStressMode: (active: boolean) => void;
   showFormulas: boolean;
   onToggleFormulas: () => void;
 }
@@ -18,10 +20,83 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onAlgorithmChange,
   onToggleServer,
   onReset,
+  onSetStressMode,
   showFormulas,
   onToggleFormulas,
 }) => {
   const isNash = stats.algorithm === 'nash';
+
+  const [stressStartSimTime, setStressStartSimTime] = React.useState<number | null>(null);
+  const [showResults, setShowResults] = React.useState(false);
+  const [infoModalAlgo, setInfoModalAlgo] = React.useState<'round-robin' | 'nash' | null>(null);
+
+  const handleExportCSV = React.useCallback(() => {
+    const header = "tiempo_s,algoritmo,procesados,perdidos,drop_rate_pct,std_dev_carga,paquetes_por_segundo\n";
+    const rows = stats.history.map(h => {
+      const dropRatePct = (h.totalProcessed + h.totalDropped) > 0 
+        ? ((h.totalDropped / (h.totalProcessed + h.totalDropped)) * 100).toFixed(2) 
+        : '0.00';
+      return `${h.time},${h.algorithm},${h.totalProcessed},${h.totalDropped},${dropRatePct},${h.stdDevLoad?.toFixed(4)},${h.packetsPerSecond}`;
+    });
+    const csvContent = header + rows.join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `simulacion_balanceo_${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [stats.history]);
+
+  const startStressTest = () => {
+    if (stressStartSimTime !== null) return;
+    setShowResults(true);
+    onAlgorithmChange('round-robin');
+    onReset(false); // Full reset
+    onSetStressMode(true); // START tracking stats!
+    setStressStartSimTime(stats.simulationTime); // This will actually be 0 since we just reset
+    // Initial jump to start the test visually
+    onTrafficChange(20);
+  };
+
+  React.useEffect(() => {
+    if (stressStartSimTime === null) return;
+    
+    // Elapsed time in seconds based on actual simulation time (not real time)
+    const elapsed = Math.floor((stats.simulationTime - stressStartSimTime) / 1000);
+    
+    if (elapsed === 30 && stats.algorithm !== 'nash') {
+      onAlgorithmChange('nash');
+      onReset(true); // reset queues but preserve rrStats & history
+    }
+
+    const phaseTime = elapsed % 30;
+    
+    if (phaseTime <= 5 && phaseTime > 0) onTrafficChange(20);
+    else if (phaseTime <= 15 && phaseTime > 5) onTrafficChange(80);
+    else if (phaseTime <= 25 && phaseTime > 15) onTrafficChange(180);
+    else if (phaseTime === 0 || phaseTime > 25) onTrafficChange(20);
+    
+    if (elapsed >= 60) {
+      setStressStartSimTime(null);
+      onSetStressMode(false); // STOP tracking stats
+      onTrafficChange(0); // Reset traffic to 0
+    }
+  }, [stressStartSimTime, stats.simulationTime, stats.algorithm, onTrafficChange, onAlgorithmChange, onReset, onSetStressMode]); 
+
+  // the UI counter
+  const stressTime = stressStartSimTime !== null ? Math.floor((stats.simulationTime - stressStartSimTime) / 1000) : null;
+
+  const dropRatePct = stats.totalProcessed + stats.totalDropped > 0 
+    ? (stats.totalDropped / (stats.totalProcessed + stats.totalDropped)) * 100 
+    : 0;
+  const dropColor = dropRatePct < 5 ? 'green' : dropRatePct <= 15 ? 'yellow' : 'red';
+
+  const getAvgStdDev = (history: number[]) => history.length ? history.reduce((a, b) => a + b, 0) / history.length : 0;
+  const rrDrop = stats.rrStats.processed + stats.rrStats.dropped > 0 ? (stats.rrStats.dropped / (stats.rrStats.processed + stats.rrStats.dropped)) * 100 : 0;
+  const nashDrop = stats.nashStats.processed + stats.nashStats.dropped > 0 ? (stats.nashStats.dropped / (stats.nashStats.processed + stats.nashStats.dropped)) * 100 : 0;
+  const rrAvgDev = getAvgStdDev(stats.rrStats.stdDevHistory);
+  const nashAvgDev = getAvgStdDev(stats.nashStats.stdDevHistory);
 
   return (
     <aside className="control-panel" id="control-panel">
@@ -95,7 +170,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           >
             <span className="algo-icon">↻</span>
             <div>
-              <strong>Round Robin</strong>
+              <strong>Round Robin <span onClick={(e) => { e.stopPropagation(); setInfoModalAlgo('round-robin'); }} title="Ver información de Round Robin" style={{ cursor: 'pointer', color: 'var(--cyan)' }}>ⓘ</span></strong>
               <small>Secuencial reactivo</small>
             </div>
           </button>
@@ -106,7 +181,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           >
             <span className="algo-icon">⟐</span>
             <div>
-              <strong>Equilibrio Nash</strong>
+              <strong>Equilibrio Nash <span onClick={(e) => { e.stopPropagation(); setInfoModalAlgo('nash'); }} title="Ver información del Equilibrio de Nash" style={{ cursor: 'pointer', color: 'var(--purple)' }}>ⓘ</span></strong>
               <small>Heurístico adaptativo</small>
             </div>
           </button>
@@ -142,6 +217,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className="stat-value red">{stats.totalDropped.toLocaleString()}</div>
             <div className="stat-label">Perdidos</div>
           </div>
+          <div className="stat-card">
+            <div className={`stat-value ${dropColor}`}>{dropRatePct.toFixed(1)}%</div>
+            <div className="stat-label">Drop Rate</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value cyan">{stats.loadStdDev.toFixed(2)}</div>
+            <div className="stat-label">Equilibrio (σ)</div>
+          </div>
         </div>
 
         {/* ── History Chart ── */}
@@ -176,10 +259,53 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
       </section>
 
+      {/* ── Comparative Panel ── */}
+      {showResults && (
+        <section className="panel-section" id="comparative-section">
+          <div className="section-header">
+            <span className="section-icon">⚖</span>
+            <h2>Comparativa de Algoritmos</h2>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <strong style={{ color: 'var(--cyan)' }}>Round Robin</strong>
+                <div title="Drop Rate (Tasa de pérdida). Fórmula: (Paquetes Perdidos / Total de Paquetes) * 100" style={{ cursor: 'help', borderBottom: '1px dotted var(--text-secondary)', width: 'fit-content' }}>Drop: {rrDrop.toFixed(1)}%</div>
+                <div title="Desviación Estándar Promedio. Mide la estabilidad de la carga entre servidores. Menor es mejor. Fórmula: √( Σ(Carga_i - Media)² / N )" style={{ cursor: 'help', borderBottom: '1px dotted var(--text-secondary)', width: 'fit-content' }}>σ prom: {rrAvgDev.toFixed(3)}</div>
+              </div>
+              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                <strong style={{ color: 'var(--purple)' }}>Nash</strong>
+                <div title="Drop Rate (Tasa de pérdida). Fórmula: (Paquetes Perdidos / Total de Paquetes) * 100" style={{ cursor: 'help', borderBottom: '1px dotted var(--text-secondary)', width: 'fit-content' }}>Drop: {nashDrop.toFixed(1)}%</div>
+                <div title="Desviación Estándar Promedio. Mide la estabilidad de la carga entre servidores. Menor es mejor. Fórmula: √( Σ(Carga_i - Media)² / N )" style={{ cursor: 'help', borderBottom: '1px dotted var(--text-secondary)', width: 'fit-content' }}>σ prom: {nashAvgDev.toFixed(3)}</div>
+              </div>
+            </div>
+            {rrDrop + nashDrop > 0 && (
+              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '5px 10px', borderRadius: '4px', textAlign: 'center', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                Ganador actual: <strong style={{ color: nashDrop < rrDrop ? 'var(--purple)' : 'var(--cyan)' }}>{nashDrop < rrDrop ? 'Nash' : rrDrop < nashDrop ? 'Round Robin' : 'Empate'}</strong>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ── Actions ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+        <button className="algo-btn" onClick={startStressTest} disabled={stressTime !== null} style={{ justifyContent: 'center', borderColor: stressTime !== null ? 'var(--purple)' : '' }}>
+          <strong>{stressTime !== null ? `▶ Corriendo Test (${stressTime}/60s) - ${stressTime < 30 ? 'Round Robin' : 'Nash'}` : '▶ Stress Test (RR + Nash)'}</strong>
+        </button>
+        {showResults && stressTime === null && (
+          <button id="export-csv-btn" className="algo-btn" onClick={handleExportCSV} style={{ justifyContent: 'center' }}>
+            <strong>⤓ Descargar Resultados (.csv)</strong>
+          </button>
+        )}
+      </div>
+
       {/* ── Reset ── */}
-      <button className="reset-btn" id="btn-reset" onClick={onReset}>
+      <button className="reset-btn" id="btn-reset" onClick={() => onReset()}>
         ↺ Reiniciar Simulación
       </button>
+
+      <InfoModal visible={infoModalAlgo !== null} algorithm={infoModalAlgo} onClose={() => setInfoModalAlgo(null)} />
     </aside>
   );
 };

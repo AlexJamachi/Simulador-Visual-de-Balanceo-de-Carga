@@ -13,7 +13,7 @@ export function computeLayout(canvasW: number, canvasH: number) {
   const lbPos: Vec2 = { x: canvasW * 0.15, y: canvasH * 0.5 };
 
   const serverPositions: Vec2[] = [];
-  const count = 4;
+  const count = 6;
   const startY = canvasH * 0.15;
   const endY = canvasH * 0.85;
   const step = (endY - startY) / (count - 1);
@@ -29,9 +29,9 @@ export function computeLayout(canvasW: number, canvasH: number) {
 export function createInitialState(canvasW: number, canvasH: number): SimulationState {
   const { serverPositions } = computeLayout(canvasW, canvasH);
 
-  // Diverse characteristics for 4 servers
-  const capacities = [150, 80, 120, 200];
-  const speeds = [1.2, 0.8, 1.0, 1.5]; // Multipliers
+  // Diverse characteristics for 6 servers
+  const capacities = [150, 80, 120, 200, 100, 160];
+  const speeds = [1.2, 0.8, 1.0, 1.5, 0.9, 1.3]; // Multipliers
 
   const servers: ServerNode[] = serverPositions.map((pos, i) => ({
     id: i,
@@ -51,7 +51,7 @@ export function createInitialState(canvasW: number, canvasH: number): Simulation
     servers,
     packets: [],
     algorithm: 'round-robin',
-    packetsPerSecond: 10,
+    packetsPerSecond: 0,
     totalProcessed: 0,
     totalDropped: 0,
     nextPacketId: 0,
@@ -62,6 +62,10 @@ export function createInitialState(canvasW: number, canvasH: number): Simulation
     lastHistoryTime: 0,
     lastProcessedCount: 0,
     lastDroppedCount: 0,
+    loadStdDev: 0,
+    rrStats: { processed: 0, dropped: 0, stdDevHistory: [] },
+    nashStats: { processed: 0, dropped: 0, stdDevHistory: [] },
+    isStressTesting: false,
   };
 }
 
@@ -83,19 +87,32 @@ function selectServerRoundRobin(state: SimulationState): number {
 }
 
 function selectServerNash(state: SimulationState): number {
-  let bestIdx = -1;
-  let bestRatio = Infinity;
-  
-  for (let i = 0; i < state.servers.length; i++) {
-    const s = state.servers[i];
-    if (!s.isActive) continue;
+  const activeServers = state.servers.filter(s => s.isActive);
+  if (activeServers.length === 0) return -1;
 
-    // Factor in packets currently in-flight targeting this server
-    const inFlight = state.packets.filter(p => p.targetServer === i).length;
-    const effectiveLoad = (s.currentLoad + inFlight) / s.maxCapacity;
-    if (effectiveLoad < bestRatio) {
-      bestRatio = effectiveLoad;
-      bestIdx = i;
+  const W1 = 0.5, W2 = 0.3, W3 = 0.2;
+
+  let bestIdx = -1;
+  let bestCost = Infinity;
+
+  for (const srv of activeServers) {
+    const cpuLoad = srv.currentLoad / srv.maxCapacity;
+    const queueLatency = srv.processingQueue.length > 0
+      ? (srv.processingQueue.reduce((a, b) => a + b, 0) / srv.processingSpeed) / 6000
+      : 0;
+    const inFlight = state.packets.filter(p => p.targetServer === srv.id).length;
+    const inFlightRatio = inFlight / srv.maxCapacity;
+
+    let cost = W1 * cpuLoad + W2 * queueLatency + W3 * inFlightRatio;
+
+    // Penalización severa si el servidor ya no tiene capacidad real
+    if (srv.currentLoad + inFlight >= srv.maxCapacity) {
+      cost += 1000; // Evita elegir servidores llenos a toda costa
+    }
+
+    if (cost < bestCost) {
+      bestCost = cost;
+      bestIdx = srv.id;
     }
   }
   return bestIdx;
@@ -160,8 +177,21 @@ export function tickSimulation(state: SimulationState, dt: number, canvasW: numb
     state.history.push({
       time: Math.floor(state.simulationTime / 1000),
       processedRate: procRate,
-      droppedRate: dropRate
+      droppedRate: dropRate,
+      algorithm: state.algorithm,
+      stdDevLoad: state.loadStdDev,
+      packetsPerSecond: state.packetsPerSecond,
+      totalProcessed: state.totalProcessed,
+      totalDropped: state.totalDropped
     });
+
+    if (state.isStressTesting) {
+      if (state.algorithm === 'round-robin') {
+        state.rrStats.stdDevHistory.push(state.loadStdDev);
+      } else {
+        state.nashStats.stdDevHistory.push(state.loadStdDev);
+      }
+    }
     
     // Keep last 60 seconds
     if (state.history.length > 60) state.history.shift();
@@ -221,22 +251,34 @@ export function tickSimulation(state: SimulationState, dt: number, canvasW: numb
     if (pkt.targetServer === -1) {
       // Dropped because no servers available
       state.totalDropped++;
+      if (state.isStressTesting) {
+        if (state.algorithm === 'round-robin') state.rrStats.dropped++; else state.nashStats.dropped++;
+      }
     } else {
       const srv = state.servers[pkt.targetServer];
       
       // If server went offline while packet was in transit, drop it
       if (!srv.isActive) {
         state.totalDropped++;
+        if (state.isStressTesting) {
+          if (state.algorithm === 'round-robin') state.rrStats.dropped++; else state.nashStats.dropped++;
+        }
         srv.droppedCount++;
       }
       else if (srv.currentLoad < srv.maxCapacity) {
         srv.currentLoad++;
         srv.processingQueue.push(pkt.weight);
         state.totalProcessed++;
+        if (state.isStressTesting) {
+          if (state.algorithm === 'round-robin') state.rrStats.processed++; else state.nashStats.processed++;
+        }
         srv.resolvedCount++;
       } else {
         // Server full → packet dropped
         state.totalDropped++;
+        if (state.isStressTesting) {
+          if (state.algorithm === 'round-robin') state.rrStats.dropped++; else state.nashStats.dropped++;
+        }
         srv.droppedCount++;
       }
     }
@@ -269,5 +311,18 @@ export function tickSimulation(state: SimulationState, dt: number, canvasW: numb
 
     // Update pulse
     srv.pulsePhase += dt * 0.003;
+  }
+
+  // Calculate standard deviation of load
+  const activeLoads = state.servers
+    .filter(s => s.isActive)
+    .map(s => s.currentLoad / s.maxCapacity);
+  
+  if (activeLoads.length > 0) {
+    const mean = activeLoads.reduce((a, b) => a + b, 0) / activeLoads.length;
+    const variance = activeLoads.reduce((sum, x) => sum + Math.pow(x - mean, 2), 0) / activeLoads.length;
+    state.loadStdDev = Math.sqrt(variance);
+  } else {
+    state.loadStdDev = 0;
   }
 }

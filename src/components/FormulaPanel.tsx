@@ -23,38 +23,57 @@ const FormulaPanel: React.FC<FormulaPanelProps> = ({ stats, visible, onClose }) 
         <div className="formula-content">
           <h4>Equilibrio de Nash</h4>
           <div className="math-box">
-            <code>Costo(S) = (Carga + En_Vuelo) / Capacidad</code>
-            <p>Se selecciona el servidor <em>S</em> que minimice <code>Costo(S)</code></p>
+            <code>Costo = 0.5·CPU + 0.3·Lat + 0.2·Vuelo</code>
+            <p>Se selecciona el servidor que <strong>minimice</strong> el Costo</p>
           </div>
           
           <table className="data-table">
             <thead>
               <tr>
                 <th>SRV</th>
-                <th>Carga</th>
-                <th>Vuelo</th>
-                <th>Cap</th>
-                <th>Costo</th>
+                <th>CPU%</th>
+                <th>Lat%</th>
+                <th>Vuelo%</th>
+                <th>Costo Nash</th>
               </tr>
             </thead>
             <tbody>
-              {stats.serverLoads.map((loadPct, i) => {
-                const isActive = stats.serverStatus[i];
-                const capacity = stats.serverCapacities[i];
-                const inFlight = stats.inFlightCounts[i];
-                const actualLoad = (loadPct / 100) * capacity;
-                const cost = isActive ? ((actualLoad + inFlight) / capacity).toFixed(2) : 'N/A';
-                
-                return (
-                  <tr key={i} className={!isActive ? 'offline-row' : ''}>
-                    <td>0{i + 1}</td>
-                    <td>{isActive ? Math.round(actualLoad) : '-'}</td>
-                    <td>{isActive ? inFlight : '-'}</td>
-                    <td>{capacity}</td>
-                    <td className="cost-col">{cost}</td>
+              {(() => {
+                let bestIdx = -1;
+                let minCost = Infinity;
+                const rowsData = stats.serverLoads.map((loadPct, i) => {
+                  const isActive = stats.serverStatus[i];
+                  const capacity = stats.serverCapacities[i];
+                  const speed = stats.serverSpeeds[i];
+                  const queueLatency = stats.serverQueues[i].length > 0 
+                    ? (stats.serverQueues[i].reduce((a, b) => a + b, 0) / speed) / 6000 
+                    : 0;
+                  const inFlight = stats.inFlightCounts[i];
+                  const cpuLoad = loadPct / 100;
+                  const inFlightRatio = inFlight / capacity;
+                  let cost = isActive ? (0.5 * cpuLoad + 0.3 * queueLatency + 0.2 * inFlightRatio) : Infinity;
+                  
+                  if (isActive && ((loadPct / 100) * capacity + inFlight >= capacity)) {
+                    cost += 1000;
+                  }
+
+                  if (isActive && cost < minCost) {
+                    minCost = cost;
+                    bestIdx = i;
+                  }
+                  return { isActive, cpuLoad, queueLatency, inFlightRatio, cost };
+                });
+
+                return rowsData.map((data, i) => (
+                  <tr key={i} className={!data.isActive ? 'offline-row' : ''} style={i === bestIdx ? { backgroundColor: 'rgba(180, 50, 255, 0.2)', outline: '1px solid var(--purple)' } : {}}>
+                    <td>{String(i + 1).padStart(2, '0')}</td>
+                    <td>{data.isActive ? (data.cpuLoad * 100).toFixed(0) + '%' : '-'}</td>
+                    <td>{data.isActive ? (data.queueLatency * 100).toFixed(0) + '%' : '-'}</td>
+                    <td>{data.isActive ? (data.inFlightRatio * 100).toFixed(0) + '%' : '-'}</td>
+                    <td className="cost-col" style={i === bestIdx ? { color: '#fff', fontWeight: 'bold' } : {}}>{data.isActive ? data.cost.toFixed(3) : 'N/A'}</td>
                   </tr>
-                );
-              })}
+                ));
+              })()}
             </tbody>
           </table>
         </div>
@@ -84,7 +103,7 @@ const FormulaPanel: React.FC<FormulaPanelProps> = ({ stats, visible, onClose }) 
             const isActive = stats.serverStatus[i];
             return (
               <div key={i} className={`gantt-row ${!isActive ? 'offline-row' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--cyan)', width: '40px' }}>SRV-0{i + 1}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--cyan)', width: '40px' }}>SRV-{String(i + 1).padStart(2, '0')}</span>
                 <div className="gantt-track" style={{ flex: 1, height: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex', overflow: 'hidden' }}>
                   {isActive ? (
                     queue.length === 0 ? (

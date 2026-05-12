@@ -14,16 +14,20 @@ function App() {
   const [stats, setStats] = useState<SimulationStats>({
     totalProcessed: 0,
     totalDropped: 0,
-    serverLoads: [0, 0, 0, 0],
-    serverStatus: [true, true, true, true],
-    serverCapacities: [150, 80, 120, 200],
-    serverSpeeds: [1.2, 0.8, 1.0, 1.5],
-    inFlightCounts: [0, 0, 0, 0],
-    serverQueues: [[], [], [], []],
+    serverLoads: [0, 0, 0, 0, 0, 0],
+    serverStatus: [true, true, true, true, true, true],
+    serverCapacities: [150, 80, 120, 200, 100, 160],
+    serverSpeeds: [1.2, 0.8, 1.0, 1.5, 0.9, 1.3],
+    inFlightCounts: [0, 0, 0, 0, 0, 0],
+    serverQueues: [[], [], [], [], [], []],
+    loadStdDev: 0,
+    rrStats: { processed: 0, dropped: 0, stdDevHistory: [] },
+    nashStats: { processed: 0, dropped: 0, stdDevHistory: [] },
     algorithm: 'round-robin',
-    packetsPerSecond: 10,
+    packetsPerSecond: 0,
     history: [],
     roundRobinIndex: 0,
+    simulationTime: 0,
   });
 
   const [showFormulas, setShowFormulas] = useState(false);
@@ -43,6 +47,10 @@ function App() {
       packetsPerSecond: s.packetsPerSecond,
       history: [...s.history], // Shallow copy to trigger re-render
       roundRobinIndex: s.roundRobinIndex,
+      loadStdDev: s.loadStdDev,
+      rrStats: { ...s.rrStats, stdDevHistory: [...s.rrStats.stdDevHistory] },
+      nashStats: { ...s.nashStats, stdDevHistory: [...s.nashStats.stdDevHistory] },
+      simulationTime: s.simulationTime,
     });
   }, []);
 
@@ -54,6 +62,10 @@ function App() {
     stateRef.current.algorithm = mode;
   }, []);
 
+  const handleSetStressMode = useCallback((active: boolean) => {
+    stateRef.current.isStressTesting = active;
+  }, []);
+
   const handleToggleServer = useCallback((id: number) => {
     const srv = stateRef.current.servers[id];
     if (srv) {
@@ -63,7 +75,7 @@ function App() {
     }
   }, [handleStatsUpdate]);
 
-  const handleReset = useCallback(() => {
+  const handleReset = useCallback((preserveStats: boolean = false) => {
     const canvas = document.getElementById('simulation-canvas') as HTMLCanvasElement | null;
     const w = canvas?.parentElement?.getBoundingClientRect().width ?? DEFAULT_W;
     const h = canvas?.parentElement?.getBoundingClientRect().height ?? DEFAULT_H;
@@ -71,6 +83,15 @@ function App() {
     // Preserve user settings
     newState.algorithm = stateRef.current.algorithm;
     newState.packetsPerSecond = stateRef.current.packetsPerSecond;
+    newState.isStressTesting = stateRef.current.isStressTesting; // VERY IMPORTANT!
+    
+    if (preserveStats) {
+      newState.rrStats = { ...stateRef.current.rrStats };
+      newState.nashStats = { ...stateRef.current.nashStats };
+      newState.history = [...stateRef.current.history];
+      newState.simulationTime = stateRef.current.simulationTime;
+    }
+    
     Object.assign(stateRef.current, newState);
     handleStatsUpdate();
   }, [handleStatsUpdate]);
@@ -87,6 +108,7 @@ function App() {
         onAlgorithmChange={handleAlgorithmChange}
         onToggleServer={handleToggleServer}
         onReset={handleReset}
+        onSetStressMode={handleSetStressMode}
       />
     </div>
   );

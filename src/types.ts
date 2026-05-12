@@ -52,6 +52,17 @@ export interface HistoricalDataPoint {
   time: number;
   processedRate: number; // packets per second at this snapshot
   droppedRate: number;
+  algorithm: AlgorithmMode;
+  stdDevLoad: number;
+  packetsPerSecond: number;
+  totalProcessed: number;
+  totalDropped: number;
+}
+
+export interface AlgoStats {
+  processed: number;
+  dropped: number;
+  stdDevHistory: number[];
 }
 
 export interface SimulationState {
@@ -73,6 +84,10 @@ export interface SimulationState {
   lastHistoryTime: number;
   lastProcessedCount: number;
   lastDroppedCount: number;
+  loadStdDev: number;
+  rrStats: AlgoStats;
+  nashStats: AlgoStats;
+  isStressTesting: boolean;
 }
 
 export interface SimulationStats {
@@ -88,4 +103,8 @@ export interface SimulationStats {
   packetsPerSecond: number;
   history: HistoricalDataPoint[];
   roundRobinIndex: number;
+  loadStdDev: number;
+  rrStats: AlgoStats;
+  nashStats: AlgoStats;
+  simulationTime: number;
 }
