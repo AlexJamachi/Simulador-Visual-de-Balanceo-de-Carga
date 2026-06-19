@@ -28,7 +28,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
   const [stressStartSimTime, setStressStartSimTime] = React.useState<number | null>(null);
   const [showResults, setShowResults] = React.useState(false);
-  const [infoModalAlgo, setInfoModalAlgo] = React.useState<'round-robin' | 'nash' | null>(null);
+  const [infoModalAlgo, setInfoModalAlgo] = React.useState<'round-robin' | 'nash' | 'faq' | null>(null);
 
   const handleExportCSV = React.useCallback(() => {
     const header = "tiempo_s,algoritmo,procesados,perdidos,drop_rate_pct,std_dev_carga,paquetes_por_segundo\n";
@@ -186,16 +186,27 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
           </button>
         </div>
-        <div style={{ marginTop: '10px' }}>
+        <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
           <button 
             className={`algo-btn ${showFormulas ? 'active' : ''} formula-btn`}
             onClick={onToggleFormulas}
-            style={{ width: '100%', borderColor: '#00c8ff' }}
+            style={{ flex: 1, borderColor: '#00c8ff', padding: '10px 5px' }}
           >
             <span className="algo-icon">∑</span>
-            <div>
-              <strong>Ver Fórmulas en Caliente</strong>
-              <small>Datos en tiempo real</small>
+            <div style={{ textAlign: 'left' }}>
+              <strong>Fórmulas</strong>
+              <small>En tiempo real</small>
+            </div>
+          </button>
+          <button 
+            className="algo-btn formula-btn"
+            onClick={() => setInfoModalAlgo('faq')}
+            style={{ flex: 1, borderColor: 'var(--text-main)', padding: '10px 5px' }}
+          >
+            <span className="algo-icon">?</span>
+            <div style={{ textAlign: 'left' }}>
+              <strong>FAQ & Costos</strong>
+              <small>Teoría general</small>
             </div>
           </button>
         </div>

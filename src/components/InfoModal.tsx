@@ -3,7 +3,7 @@ import React from 'react';
 interface InfoModalProps {
   visible: boolean;
   onClose: () => void;
-  algorithm: 'round-robin' | 'nash' | null;
+  algorithm: 'round-robin' | 'nash' | 'faq' | null;
 }
 
 export const InfoModal: React.FC<InfoModalProps> = ({ visible, onClose, algorithm }) => {
@@ -40,7 +40,20 @@ export const InfoModal: React.FC<InfoModalProps> = ({ visible, onClose, algorith
           boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
         }}
       >
-        {algorithm === 'round-robin' ? (
+        {algorithm === 'faq' ? (
+          <>
+            <h2 style={{ color: 'var(--text-main)', borderBottom: '1px solid var(--border)', paddingBottom: '10px', marginBottom: '15px' }}>
+              Preguntas Frecuentes y Costos
+            </h2>
+            <p><strong>¿Múltiples servidores (Scale-Out) vs Uno muy potente (Scale-Up)?</strong><br/>
+              Es más eficiente y seguro usar múltiples servidores. Si se usa uno solo potente, se crea un <em>Punto Único de Falla (Single Point of Failure)</em>: si se apaga, todo el sistema cae. Además, escalar horizontalmente es más económico. Nuestro algoritmo Nash optimiza justamente estas redes descentralizadas.
+            </p>
+            <p><strong>Costos de Implementación:</strong><br/>
+              - <strong>Startups/PYMES:</strong> Operación desde $20 - $50 USD mensuales en servidores virtuales (VPS), más un desarrollo inicial de software ($500 - $1,500 USD) para integrar el algoritmo en el balanceador.<br/>
+              - <strong>Grandes Empresas:</strong> Desarrollo, auditorías y despliegue inicial desde $10,000 USD. Sin embargo, logran un ahorro mensual del 30% a 40% en facturación de la nube al aprovechar la CPU eficientemente.
+            </p>
+          </>
+        ) : algorithm === 'round-robin' ? (
           <>
             <h2 style={{ color: 'var(--cyan)', borderBottom: '1px solid var(--border)', paddingBottom: '10px', marginBottom: '15px' }}>
               Round Robin (Carrusel)
